@@ -3,7 +3,7 @@
  * @package WordPress
  * @subpackage miniWork
  * @author Ralf Albert
- * @version 0.1.4
+ * @version 0.1.5
  * 
  * Klasse mit Standard-Methoden, derzeit Prüfung von WP- und PHP-Version,
  * laden der Textdomain
@@ -11,7 +11,9 @@
  * @todo: Methode getPluginData()
  * @todo on deactivate-> unload textdomain
  */
+
 if( ! class_exists( 'miniWork' ) ){
+
 	class miniWork
 	{
 		/**
@@ -42,7 +44,7 @@ if( ! class_exists( 'miniWork' ) ){
 		 * path-vars miniWork
 		 * @var string
 		 */
-		private $miniwork_abspath, $miniwork_url;
+		private $miniwork_abspath, $miniwork_relpath, $miniwork_url;
 	
 		/**
 		 * 
@@ -51,8 +53,9 @@ if( ! class_exists( 'miniWork' ) ){
 		 * @param mixed string|array $args path to parent file
 		 */
 		public function __construct( $args = false ){
-			
+
 			if( is_array( $args ) ){
+
 				$this->_configure( $args );	
 			}
 			else {
@@ -85,8 +88,10 @@ if( ! class_exists( 'miniWork' ) ){
 					$this->NoUpgradeCheck();
 				}
 				
-				if( $this->settings['load_textdomain'] )
+				if( $this->settings['load_textdomain'] ){
+					
 					$this->LoadTextdomain( $this->textdomain, $this->domainpath );
+				}
 					
 			}
 			
@@ -124,6 +129,7 @@ if( ! class_exists( 'miniWork' ) ){
 	
 			// miniWork related
 			$this->miniwork_abspath = dirname( __FILE__ );
+			$this->miniwork_relpath = dirname( plugin_basename( __FILE__ ) ) ;
 			$this->miniwork_url = str_replace( rtrim( $this->wp_abspath, '/' ), $this->wp_home, $this->miniwork_abspath );
 			
 			// windows only (dev-system)
@@ -139,6 +145,13 @@ if( ! class_exists( 'miniWork' ) ){
 				
 			if( empty( $this->settings['domainpath'] ) )	
 				$this->settings['domainpath'] = $this->plugin_data['DomainPath'];
+				
+			//korrektur domainpath
+			// grab the folder
+			$parts = explode( '/', $this->settings['domainpath'] );
+			// add basedir to folder
+			$this->settings['domainpath'] = $this->_basedir.'/'.$parts[count($parts)-1];
+			unset( $parts );
 				
 		}
 		 
@@ -219,7 +232,43 @@ if( ! class_exists( 'miniWork' ) ){
 			
 		}
 		
+		/**
+		 * 
+		 * Load textdomain
+		 * @since 0.1.5
+		 * @throws Exception
+		 */
+		protected function _textdomain( $textdomain = false, $domainpath = false ){
 		
+			if( !$textdomain ){
+				
+				if( !empty( $this->settings['textdomain'] ) ){
+					$textdomain = $this->settings['textdomain'];
+					
+				} elseif( !empty( $this->plugin_data['TextDomain'] ) ){
+					$textdomain = $this->plugin_data['TextDomain'];
+					
+				} elseif( !$textdomain || '' == $textdomain  ){
+					return 'No textdomain';		
+				}
+			}
+	
+			if( !$domainpath ){
+				
+				if( !empty( $this->settings['domainpath'] ) ){
+					$domainpath = $this->settings['domainpath'];
+					
+				} elseif( !empty( $this->plugin_data['DomainPath'] ) ){
+					$domainpath = $this->plugin_data['DomainPath'];
+					
+				} elseif( !$domainpath || '' == $domainpath  ){
+					return 'No domainpath';				
+				}
+			}
+
+			return load_plugin_textdomain( $textdomain, false, $domainpath );
+		}
+					
 		/**
 		 * Setter
 		 * @since 0.1.2
@@ -272,17 +321,21 @@ if( ! class_exists( 'miniWork' ) ){
 		
 		/**
 		 * 
-		 * Load the (plugin-)textdomain
+		 * Load the plugin-textdomain
 		 * @since 0.1.3
 		 */
 		public function LoadTextdomain( $textdomain = false, $domainpath = false ){
 	
-			$success = $this->_loadtextdomain( $textdomain, $domainpath );
-				if( !$success ){
-					throw new Exception('textdomain not loaded');
+			$success = $this->_textdomain( $textdomain, $domainpath );
+
+				if( is_string( $success ) ){
+					throw new Exception( $success );
 				}
-		}
-		
+				
+				if( !$success ){
+					throw new Exception('textdomain not loaded with unknown reason');
+				}
+		}	
 		
 		/**
 		 * 
@@ -369,6 +422,7 @@ if( ! class_exists( 'miniWork' ) ){
 	
 			global $wp_version;
 			$textdomain = 'miniwork';
+			$domainpath = $this->miniwork_relpath.'/babel';
 	
 			// In case of using miniWork->activate() the function deactivate_plugins is not present on deactivation of plugins
 			// So do not check on deactivation
@@ -378,7 +432,7 @@ if( ! class_exists( 'miniWork' ) ){
 			
 				
 			if ( !version_compare( $wp_version, $this->settings['wp_version'], '>=') ) {
-				$this->_textdomain( $textdomain );
+				$this->_textdomain( $textdomain, $domainpath );
 				
 				deactivate_plugins( $this->_parent );
 				// @todo throw exception instead of die()
@@ -392,7 +446,7 @@ if( ! class_exists( 'miniWork' ) ){
 			}
 			
 			if ( version_compare(PHP_VERSION, $this->settings['php_version'], '<') ) {
-				$this->_textdomain( $textdomain );
+				$this->_textdomain( $textdomain, $domainpath );
 				
 				deactivate_plugins( $this->_parent ); // Deactivate ourself
 				// @todo throw exception instead of die()
@@ -406,73 +460,7 @@ if( ! class_exists( 'miniWork' ) ){
 			}
 		}
 		
-		/**
-		 * 
-		 * Load textdomain for error-messages in activate
-		 * @since 0.1.4
-		 * @throws Exception
-		 */
-		private function _textdomain( $textdomain = false, $domainpath = false ){
-			
-			if( !$textdomain ){
-				
-				if( !empty( $this->settings['textdomain'] ) ){
-					$textdomain = $this->settings['textdomain'];
-					
-				} elseif( !empty( $this->plugin_data['TextDomain'] ) ){
-					$textdomain = $this->plugin_data['TextDomain'];
-					
-				} elseif( !$textdomain || '' == $textdomain  ){
-					$textdomain = 'de_DE';
-					throw new Exception('No textdomain');		
-				}
-			}
-	
-			if( !$domainpath ){
-				
-				if( !empty( $this->settings['domainpath'] ) ){
-					$domainpath = $this->settings['domainpath'];
-					
-				} elseif( !empty( $this->plugin_data['DomainPath'] ) ){
-					$domainpath = $this->plugin_data['DomainPath'];
-					
-				} elseif( !$domainpath || '' == $domainpath  ){
-					$domainpath = '/languages';
-					throw new Exception('No domainpath');				
-				}
-			}
-			
-			return load_plugin_textdomain( $textdomain, $domainpath );
-		}
-		
-		private function _activate_textdomain( $textdomain = 'miniwork' ){
-			global $l10n;
-			$load_td = true;
-	
-			// textdomain already loaded			
-			if( isset( $l10n[$textdomain] ) ){
-				return;
-			}
-					
-			$mofile = $this->miniwork_abspath.'/babel/'.$textdomain.'-'.get_locale().'.mo';
-				if( !is_readable( $mofile ) ){
-					throw new Exception('mo-file not found. mo-file: '.$mofile);
-					$load_td = false;
-				}
-				
-	
-			if( $load_td ){
-				$success = load_textdomain( $textdomain, $mofile );
-				if( !$success ){
-					throw new Exception('textdomain was not loaded');
-					$textdomain = false;
-				}
-			}
-			
-			// garbage collection
-			unset( $load_td, $success, $mofile );
-		}
-	
+
 	} // end miniWork
-}	
+}
 ?>
