@@ -8,6 +8,7 @@
  * Klasse mit Standard-Methoden, derzeit Prüfung von WP- und PHP-Version,
  * laden der Textdomain
  * 
+ * @todo: Methode getPluginData()
  * @todo on deactivate-> unload textdomain
  */
 class miniWork
@@ -47,7 +48,7 @@ class miniWork
 	 * data from the plugin header
 	 * @var array
 	 */
-	private $plugin_data = array();
+	public $plugin_data = array();
 	
 	/**
 	 * 
@@ -62,7 +63,9 @@ class miniWork
 			$this->configure( $args );	
 		}
 		else {
+			// set parent path
 			$this->_getParent( $args );
+			// set all other vars from defaults
 			$this->configure();
 		}
 		
@@ -279,6 +282,7 @@ class miniWork
 	 *  
 	 */
 	public function LoadTextdomain( $textdomain = false, $domainpath = false ){
+
 		if( !$this->helper )
 			return false;			
 			
@@ -367,9 +371,9 @@ class miniWork
 	 * @since 0.1.0
 	 */
 	public function activate() {
-	
-		global $wp_version, $l10n;
-		$load_td = true;
+
+		global $wp_version;
+		$textdomain = 'miniwork';
 
 		// In case of using miniWork->activate() the function deactivate_plugins is not present on deactivation of plugins
 		// So do not check on deactivation
@@ -377,33 +381,12 @@ class miniWork
 			return false;
 		}
 		
-		$textdomain = 'miniwork';
-			// textdomain already loaded			
-			if( isset( $l10n[$textdomain] ) ){
-				#throw new Exception('textdomain already loaded');
-				$load_td = false;
-			}
-				
-		$mofile = $this->miniwork_abspath.'/languages/'.$textdomain.'-'.get_locale().'.mo';
-			if( !is_readable( $mofile ) ){
-				#throw new Exception('mo-file not found -> '.$mofile);
-				$load_td = false;
-			}
 			
-
-		if( $load_td ){
-			$success = load_textdomain( $textdomain, $mofile );
-			if( !$success ){
-				#throw new Exception('textdomain was not loaded');
-				$textdomain = false;
-			}
-		}
-			
-		// garbage collection
-		unset( $load_td, $success, $mofile );
-	
 		if ( !version_compare( $wp_version, $this->settings['wp_version'], '>=') ) {
+			$this->_activate_textdomain( $textdomain );
+			
 			deactivate_plugins( $this->_parent );
+			// @todo throw exception instead of die()
 			die( 
 				wp_sprintf( 
 					'<strong>%1s:</strong><br />'
@@ -414,7 +397,10 @@ class miniWork
 		}
 		
 		if ( version_compare(PHP_VERSION, $this->settings['php_version'], '<') ) {
+			$this->_activate_textdomain( $textdomain );
+			
 			deactivate_plugins( $this->_parent ); // Deactivate ourself
+			// @todo throw exception instead of die()
 			die( 
 				wp_sprintf(
 					'<strong>%1s:</strong><br />'
@@ -423,6 +409,39 @@ class miniWork
 				)
 			);
 		}
+	}
+	
+	/**
+	 * 
+	 * Load textdomain for error-messages in activate
+	 * @throws Exception
+	 */
+	private function _activate_textdomain( $textdomain = 'miniwork' ){
+		global $l10n;
+		$load_td = true;
+
+		// textdomain already loaded			
+		if( isset( $l10n[$textdomain] ) ){
+			return;
+		}
+				
+		$mofile = $this->miniwork_abspath.'/babel/'.$textdomain.'-'.get_locale().'.mo';
+			if( !is_readable( $mofile ) ){
+				throw new Exception('mo-file not found. mo-file: '.$mofile);
+				$load_td = false;
+			}
+			
+
+		if( $load_td ){
+			$success = load_textdomain( $textdomain, $mofile );
+			if( !$success ){
+				throw new Exception('textdomain was not loaded');
+				$textdomain = false;
+			}
+		}
+		
+		// garbage collection
+		unset( $load_td, $success, $mofile );
 	}
 
 } // end miniWork	

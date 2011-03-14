@@ -25,7 +25,7 @@ class TextdomainTools
 				
 			} elseif( !$textdomain || '' == $textdomain  ){
 				$textdomain = 'de_DE';
-				#throw new Exception('No textdomain');		
+				throw new Exception('No textdomain');		
 			}
 		}
 
@@ -39,7 +39,7 @@ class TextdomainTools
 				
 			} elseif( !$domainpath || '' == $domainpath  ){
 				$domainpath = '/languages';
-				#throw new Exception('No domainpath');				
+				throw new Exception('No domainpath');				
 			}
 		}
 				
@@ -51,7 +51,6 @@ class TextdomainTools
 
 			if( !$success ){
 				throw new Exception('Can\'t load textdomain.');
-
 			}
 			
 			return $success;
@@ -61,7 +60,7 @@ class TextdomainTools
 	}
 	
 	private function fetchMofile( $textdomain, $domainpath ){
-		$locale = get_locale();
+		$locale = apply_filters( 'plugin_locale', get_locale(), $textdomain );
 			
 		$path = $this->mother->wp_abspath . ltrim($this->mother->plugindir, '/') . '/' . $domainpath;
 		$mofile = $path . '/' . $textdomain . '-' . $locale . '.mo';
@@ -79,8 +78,8 @@ class TextdomainTools
 			$mofile = str_replace( $textdomain . '-', '', $mofile );
 				if( !file_exists( $mofile ) ){
 					// really nothing was found
+					throw new Exception('mo-file not found. mo-file:'.$mofile.' | domain: '.$textdomain.' | domainpath: '.$domainpath);
 					$mofile = false;
-					throw new Exception('mo-file not found.');
 			}
 		}
 		
