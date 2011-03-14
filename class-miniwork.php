@@ -23,13 +23,6 @@ if( ! class_exists( 'miniWork' ) ){
 		
 		/**
 		 * 
-		 * helper class for loadtextdomain
-		 * @var object
-		 */	
-		private $helper;
-		
-		/**
-		 * 
 		 * path-vars plugin/theme
 		 * @var string
 		 * @todo: YAGNI? -> $_baseurl, $contentdir
@@ -37,13 +30,6 @@ if( ! class_exists( 'miniWork' ) ){
 		public $_parent, $_basename, $_basedir, $_baseurl;
 		public $wp_home, $wp_abspath, $plugindir, $contentdir;
 		
-		/**
-		 * 
-		 * textdomain
-		 * @var string
-		 */
-		public $textdomain, $domainpath;
-	
 		/**
 		 * 
 		 * data from the plugin header
@@ -67,13 +53,13 @@ if( ! class_exists( 'miniWork' ) ){
 		public function __construct( $args = false ){
 			
 			if( is_array( $args ) ){
-				$this->configure( $args );	
+				$this->_configure( $args );	
 			}
 			else {
 				// set parent path
 				$this->_getParent( $args );
 				// set all other vars from defaults
-				$this->configure();
+				$this->_configure();
 			}
 			
 			$this->_init();
@@ -147,24 +133,13 @@ if( ! class_exists( 'miniWork' ) ){
 			// fetch data from plugin header
 			$this->_collector();
 			
-			// fetch these data from the plugin header if they wasn't set before
-			if( empty( $this->textdomain ) )
-				$this->textdomain = $this->plugin_data['TextDomain'];
+			// fetch these data from the plugin header if they wasn't set in configure()
+			if( empty( $this->settings['textdomain'] ) )
+				$this->settings['textdomain'] = $this->plugin_data['TextDomain'];
 				
-			if( empty( $this->domainpath ) )	
-				$this->domainpath = $this->plugin_data['DomainPath'];
+			if( empty( $this->settings['domainpath'] ) )	
+				$this->settings['domainpath'] = $this->plugin_data['DomainPath'];
 				
-/*
-			// register the helper class TextdomainTools
-			try {
-				
-				require_once 'class-textdomaintools.php';
-				$this->helper = new TextdomainTools( $this );
-				
-			} catch (Exception $e) {
-				$this->helper = false;
-			}
-*/	
 		}
 		 
 		/**
@@ -211,7 +186,39 @@ if( ! class_exists( 'miniWork' ) ){
 			}
 			
 			$this->_parent = $parent;
-		} 
+		}
+		 
+		/**
+		 * 
+		 * Settings via array
+		 * Not really for public use, but an alternative way to configure miniWork
+		 * @since 0.1.4
+		 * @param array $args
+		 */
+		protected function _configure( $args = array() ){
+			$defaults = array(
+				'parent' => false,
+				'wp_version' => '3.0.0',
+				'php_version' => '5.2.8',
+				'textdomain' => false,
+				'domainpath' => false,
+			
+				'do_all' => true,
+				'is_wp_loaded' => false,
+				'use_activation_hook' => false,
+				'no_upgrade_check' => false,
+				'load_textdomain' => false,
+			);
+			
+			$this->settings = array_merge( $defaults, $args );
+			
+			if( !$this->_parent ){
+				$this->_getParent( $this->settings['parent'] );
+				unset( $this->settings['parent'] );
+			}
+			
+		}
+		
 		
 		/**
 		 * Setter
@@ -240,41 +247,6 @@ if( ! class_exists( 'miniWork' ) ){
 		
 		/**
 		 * 
-		 * Settings via array
-		 * Not really for public use, but an alternative way to configure miniWork
-		 * @since 0.1.4
-		 * @param array $args
-		 */
-		public function configure( $args = array() ){
-			$defaults = array(
-				'parent' => false,
-				'wp_version' => '3.0.0',
-				'php_version' => '5.2.8',
-				'textdomain' => false,
-				'domainpath' => false,
-			
-				'do_all' => true,
-				'is_wp_loaded' => false,
-				'use_activation_hook' => false,
-				'no_upgrade_check' => false,
-				'load_textdomain' => false,
-			);
-			
-			$this->settings = array_merge( $defaults, $args );
-			
-			if( !$this->_parent ){
-				$this->_getParent( $this->settings['parent'] );
-				unset( $this->settings['parent'] );
-			}
-			
-			$this->textdomain = $this->settings['textdomain'];
-			$this->domainpath = $this->settings['domainpath'];
-			unset( $this->settings['textdomain'], $this->settings['domainpath'] );
-			
-		}
-		
-		/**
-		 * 
 		 * Register the Plugin-Activation-Hook (PAK)
 		 * @since 0.1.3
 		 */
@@ -298,10 +270,10 @@ if( ! class_exists( 'miniWork' ) ){
 		 */
 		public function LoadTextdomain( $textdomain = false, $domainpath = false ){
 	
-			if( !$this->helper )
-				return false;			
-				
-			return $this->helper->loadtextdomain( $textdomain, $domainpath );
+			$success = $this->_loadtextdomain( $textdomain, $domainpath );
+				if( !$success ){
+					throw new Exception('textdomain not loaded');
+				}
 		}
 		
 		
@@ -399,7 +371,7 @@ if( ! class_exists( 'miniWork' ) ){
 			
 				
 			if ( !version_compare( $wp_version, $this->settings['wp_version'], '>=') ) {
-				$this->_activate_textdomain( $textdomain );
+				$this->_textdomain( $textdomain );
 				
 				deactivate_plugins( $this->_parent );
 				// @todo throw exception instead of die()
@@ -413,7 +385,7 @@ if( ! class_exists( 'miniWork' ) ){
 			}
 			
 			if ( version_compare(PHP_VERSION, $this->settings['php_version'], '<') ) {
-				$this->_activate_textdomain( $textdomain );
+				$this->_textdomain( $textdomain );
 				
 				deactivate_plugins( $this->_parent ); // Deactivate ourself
 				// @todo throw exception instead of die()
@@ -435,6 +407,35 @@ if( ! class_exists( 'miniWork' ) ){
 		 */
 		private function _textdomain( $textdomain = false, $domainpath = false ){
 			
+			if( !$textdomain ){
+				
+				if( !empty( $this->settings['textdomain'] ) ){
+					$textdomain = $this->settings['textdomain'];
+					
+				} elseif( !empty( $this->plugin_data['TextDomain'] ) ){
+					$textdomain = $this->plugin_data['TextDomain'];
+					
+				} elseif( !$textdomain || '' == $textdomain  ){
+					$textdomain = 'de_DE';
+					throw new Exception('No textdomain');		
+				}
+			}
+	
+			if( !$domainpath ){
+				
+				if( !empty( $this->settings['domainpath'] ) ){
+					$domainpath = $this->settings['domainpath'];
+					
+				} elseif( !empty( $this->plugin_data['DomainPath'] ) ){
+					$domainpath = $this->plugin_data['DomainPath'];
+					
+				} elseif( !$domainpath || '' == $domainpath  ){
+					$domainpath = '/languages';
+					throw new Exception('No domainpath');				
+				}
+			}
+			
+			return load_plugin_textdomain( $textdomain, $domainpath );
 		}
 		
 		private function _activate_textdomain( $textdomain = 'miniwork' ){
