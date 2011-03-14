@@ -227,10 +227,12 @@ if( ! class_exists( 'miniWork' ) ){
 		 * @param mixed $val
 		 */
 		public function __set( $var, $val ){
+			
 			if( key_exists( $var, $this->settings ) )
 				$this->settings[$var] = $val;
 			else
 				$this->$var = $val;
+				
 		}
 		
 		/**
@@ -239,7 +241,12 @@ if( ! class_exists( 'miniWork' ) ){
 		 * @param string $var
 		 */
 		public function __get( $var ){
-			return $this->$var;
+			
+			if( key_exists( $var, $this->settings ) )
+				return $this->settings[$var];
+			else
+				return $this->$var;
+				
 		}
 		
 			 
