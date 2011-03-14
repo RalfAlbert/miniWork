@@ -154,6 +154,7 @@ if( ! class_exists( 'miniWork' ) ){
 			if( empty( $this->domainpath ) )	
 				$this->domainpath = $this->plugin_data['DomainPath'];
 				
+/*
 			// register the helper class TextdomainTools
 			try {
 				
@@ -162,7 +163,8 @@ if( ! class_exists( 'miniWork' ) ){
 				
 			} catch (Exception $e) {
 				$this->helper = false;
-			}	
+			}
+*/	
 		}
 		 
 		/**
@@ -431,6 +433,10 @@ if( ! class_exists( 'miniWork' ) ){
 		 * @since 0.1.4
 		 * @throws Exception
 		 */
+		private function _textdomain( $textdomain = false, $domainpath = false ){
+			
+		}
+		
 		private function _activate_textdomain( $textdomain = 'miniwork' ){
 			global $l10n;
 			$load_td = true;
